@@ -1,0 +1,19 @@
+<p>
+  <b>{{title|title}}</b>
+  <br>
+  <i>>Updated: {{weather_api['update_timestamp']|format_iso_time}} (UTC+8)</i>
+</p>
+{%- for forecast in weather_api["forecasts"] -%}
+<p>
+  {{forecast['date']|format_iso_time("<u>%Y-%m-%d</u> (%a)")}}
+  <br>
+  {{forecast['forecast']}}
+  <br>
+<pre> 
+  Temperature:.. {{forecast['temperature']['low']}} - {{forecast['temperature']['high']}}C
+  Humidity:..... {{forecast['relative_humidity']['low']}} - {{forecast['relative_humidity']['high']}}%
+  Wind:......... {{forecast['wind']['speed']['low']}} - {{forecast['wind']['speed']['high']}}m/s
+  Direction:.... {{forecast['wind']['direction']}}
+</pre>
+</p>
+{%- endfor -%}

@@ -1,0 +1,12 @@
+<p>
+    <b>{{title|title}}</b>
+    <br>
+    <i> > Updated: {{weather_api['update_timestamp']|format_iso_time}} (UTC+8)</i>
+</p>
+{%- for item in weather_api['periods'] -%}
+<p>
+    <u>{{item['time']['start']|format_iso_time("%H:%M %a")}} - {{item['time']['end']|format_iso_time("%H:%M %a")}}</u>
+    <br>
+    <pre>{{item['regions'][region]}}</pre>
+</p>
+{%- endfor -%}

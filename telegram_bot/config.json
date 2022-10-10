@@ -1,0 +1,14 @@
+{
+    "server": {
+        "HOST": "192.168.0.170",
+        "HOSTNAME": "www.example.com",
+        "PORT": 88,
+        "CA_CERT_PATH": null,
+        "CERT_PATH": "cert.pem",
+        "KEY_PATH": "key.pem",
+        "BOT_TOKEN": ""
+    },
+    "database":{
+        "DB_PATH":"core/users.db"
+    }
+}
