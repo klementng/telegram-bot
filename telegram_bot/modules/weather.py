@@ -9,7 +9,7 @@ from io import BytesIO
 from utils.api.objects import InlineKeyboardMarkup
 from utils.templates import render_response_template
 from utils.general import round_datetime
-from utils.api.replies import *
+from utils.api.methods import *
 
 
 class Weather:
@@ -17,7 +17,7 @@ class Weather:
     description = "Singapore Weather"
 
     @classmethod
-    def _inline_hook_reply(cls, chat_id: int, *args) -> list[BasicReply]:
+    def _inline_hook_reply(cls, chat_id: int, *args) -> list[TelegramMethods]:
         """Return message with inline keyboard"""
 
         labels = [
@@ -34,7 +34,7 @@ class Weather:
             [f"{cls.hook} help"],
         ]
 
-        reply = MessageReply(
+        reply = SendMessage(
             chat_id,
             text=f"[{cls.hook}] Select an Option",
             reply_markup=InlineKeyboardMarkup(labels, commands)
@@ -43,7 +43,7 @@ class Weather:
         return [reply]
 
     @classmethod
-    def _inline_forecast24_reply(cls, chat_id: int, *args) -> list[BasicReply]:
+    def _inline_forecast24_reply(cls, chat_id: int, *args) -> list[TelegramMethods]:
         """Return message with inline keyboard for 24 hours forecast"""
 
         labels = [
@@ -62,7 +62,7 @@ class Weather:
             [f"{cls.hook} forecast24 south"]
         ]
 
-        reponse = MessageReply(
+        reponse = SendMessage(
             chat_id,
             text=f"[{cls.hook}] Select an Option",
             reply_markup=InlineKeyboardMarkup(labels, commands)
@@ -187,7 +187,7 @@ class Weather:
         return sitch_images(rainmap_time)
 
     @classmethod
-    def _weather_help_reply(cls, chat_id: int, *args) -> list[BasicReply]:
+    def _weather_help_reply(cls, chat_id: int, *args) -> list[TelegramMethods]:
         """Render help response"""
 
         assert args[1] == "help"
@@ -197,12 +197,12 @@ class Weather:
         except:
             text = "An error occured"
 
-        response = MessageReply(chat_id, text, parse_mode="HTML")
+        response = SendMessage(chat_id, text, parse_mode="HTML")
 
         return [response]
 
     @classmethod
-    def _weather_forecast24_reply(cls, chat_id: int, *args) -> list[BasicReply]:
+    def _weather_forecast24_reply(cls, chat_id: int, *args) -> list[TelegramMethods]:
         """24 hr forecast reply"""
 
         assert args[1] == "forecast24"
@@ -214,7 +214,7 @@ class Weather:
 
             region = args[2]
             if region not in ["north", "south", "east", "west", "central"]:
-                return [MessageReply(chat_id, f"Invalid Arguments '{args[2]}'")]
+                return [SendMessage(chat_id, f"Invalid Arguments '{args[2]}'")]
 
             try:
                 weather_api = cls._fetch_forecast24_api()
@@ -234,12 +234,12 @@ class Weather:
         else:
             text = "Too many arugmenst"
 
-        response = MessageReply(chat_id, text, parse_mode="HTML")
+        response = SendMessage(chat_id, text, parse_mode="HTML")
 
         return [response]
 
     @classmethod
-    def _weather_forecast4d_reply(cls, chat_id:int, *args) -> list[BasicReply]:
+    def _weather_forecast4d_reply(cls, chat_id:int, *args) -> list[TelegramMethods]:
         assert args[1] == "forecast4d"
 
         try:
@@ -253,11 +253,11 @@ class Weather:
         except HTTPError as e:
             text = "API Error, Try Again Later"
 
-        response = MessageReply(chat_id, text, parse_mode="HTML")
+        response = SendMessage(chat_id, text, parse_mode="HTML")
         return [response]
 
     @classmethod
-    def _weather_rainmap_reply(cls, chat_id:int, *args) -> list[BasicReply]:
+    def _weather_rainmap_reply(cls, chat_id:int, *args) -> list[TelegramMethods]:
 
         assert args[1] == "rainmap"
 
@@ -265,19 +265,19 @@ class Weather:
 
         try:
             rainmap_time, photo = cls._fetch_rainmap_api(time)
-            response = PhotoReply(
+            response = SendPhoto(
                 chat_id,
                 photo,
                 caption=f"Updated: {str(rainmap_time)}"
             )
 
         except HTTPError as e:
-            response = MessageReply(chat_id, "API Error Occured")
+            response = SendMessage(chat_id, "API Error Occured")
 
         return [response]
 
     @classmethod
-    def get_reply(cls, *args, **kwargs) -> list[BasicReply]:
+    def get_reply(cls, *args, **kwargs) -> list[TelegramMethods]:
         """
         Get replies for commands:
 
@@ -303,7 +303,7 @@ class Weather:
                 return getattr(Weather, '_weather_%s_reply' % args[1])(chat_id, *args)
 
             except AttributeError:
-                return [MessageReply(chat_id, f"Invaild arguments: {args[1:]} ")]
+                return [SendMessage(chat_id, f"Invaild arguments: {args[1:]} ")]
         
         else:
             raise Exception("This should not happen")

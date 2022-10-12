@@ -11,8 +11,7 @@ from utils.exceptions import *
 from dataclasses import InitVar, field, dataclass
 from dataclasses_json import Undefined, CatchAll, DataClassJsonMixin
 from dataclasses_json import dataclass_json, config
-import utils.api.replies as replies
-
+import utils.api.methods as methods
 
 @dataclass
 class TelegramObject(DataClassJsonMixin):
@@ -186,7 +185,7 @@ class CallbackQuery(TelegramObject):
             return self.from_.id
 
     def answer(self, token, *args, **kwargs):
-        return replies.BasicReply("answerCallbackQuery", callback_query_id=self.id, *args, **kwargs)(token)
+        return methods.TelegramMethods("answerCallbackQuery", callback_query_id=self.id, *args, **kwargs)(token)
 
 
 @dataclass(init=False)

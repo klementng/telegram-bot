@@ -2,7 +2,7 @@ import json
 import sqlite3
 import core.database as db
 from typing import Iterable
-from utils.api.replies import BasicReply, MessageReply
+from utils.api.methods import TelegramMethods, SendMessage
 from utils.api.objects import InlineKeyboardMarkup
 from utils.server.users import UserCommandState
 from utils.templates import render_response_template
@@ -156,7 +156,7 @@ class Shortcuts:
         return "Succeeded!"
 
     @classmethod
-    def _shortcuts_modify_reply(cls, user_id: int, chat_id: int, *args) -> list[BasicReply]:
+    def _shortcuts_modify_reply(cls, user_id: int, chat_id: int, *args) -> list[TelegramMethods]:
         """Modify the shortcuts list"""
 
         assert (args[1] == "modify")
@@ -173,7 +173,7 @@ class Shortcuts:
             replies.extend(
                 cls._shortcuts_show_reply(user_id, chat_id, show_full=True)
             )
-            replies.append(MessageReply(chat_id, msg, parse_mode="HTML"))
+            replies.append(SendMessage(chat_id, msg, parse_mode="HTML"))
 
             # Set listen for additional arg state to be true
             user_state.update_state(" ".join(args[0:2]), True)
@@ -182,7 +182,7 @@ class Shortcuts:
         # Check if enough arguments
         elif len(args) < 4:
             user_state.update_state(" ".join(args[0:2]), True)
-            return [MessageReply(chat_id, f"[{cls.hook} modify] Error: Not enough arguments")]
+            return [SendMessage(chat_id, f"[{cls.hook} modify] Error: Not enough arguments")]
 
         msg = f"[{cls.hook} modify] "
         action = args[2]
@@ -219,13 +219,13 @@ class Shortcuts:
 
             msg += f"\n\nMore Infomation: \n {e}"
 
-            return [MessageReply(chat_id, msg)]
+            return [SendMessage(chat_id, msg)]
 
         user_state.update_state(" ".join(args[0:2]), False)
-        return [MessageReply(chat_id, msg, reply_markup=cls._inline_hook_markup())]
+        return [SendMessage(chat_id, msg, reply_markup=cls._inline_hook_markup())]
 
     @classmethod
-    def _shortcuts_show_reply(cls, user_id, chat_id, *args, show_full=False) -> list[BasicReply]:
+    def _shortcuts_show_reply(cls, user_id, chat_id, *args, show_full=False) -> list[TelegramMethods]:
         """Query database and replies with a message with InlineMarkup"""
 
         try:
@@ -248,26 +248,26 @@ class Shortcuts:
                         callback_data.append([data])
 
                 return [
-                    MessageReply(
+                    SendMessage(
                         chat_id,
                         f"[{cls.hook}] Saved Commands:",
                         reply_markup=InlineKeyboardMarkup(labels, callback_data))
                 ]
 
             else:
-                return [MessageReply(chat_id, f"[{cls.hook} show] Your shortcut list is empty")]
+                return [SendMessage(chat_id, f"[{cls.hook} show] Your shortcut list is empty")]
 
         except sqlite3.Error:
-            return [MessageReply(chat_id, f"[{cls.hook} show] An database error occured, try again")]
+            return [SendMessage(chat_id, f"[{cls.hook} show] An database error occured, try again")]
 
     @classmethod
-    def _shortcuts_help_reply(cls, user_id, chat_id, *args) -> list[BasicReply]:
+    def _shortcuts_help_reply(cls, user_id, chat_id, *args) -> list[TelegramMethods]:
         """Render and send the help response"""
 
         assert (args[1] == "help")
         msg = render_response_template("shortcuts/help.html", hook=cls.hook)
 
-        return [MessageReply(chat_id, msg, parse_mode="HTML")]
+        return [SendMessage(chat_id, msg, parse_mode="HTML")]
 
     @classmethod
     def get_reply(cls, *args, **kwargs):
@@ -301,7 +301,7 @@ class Shortcuts:
 
         if len(args) == 1:
             return [
-                MessageReply(
+                SendMessage(
                     chat_id,
                     f"[{cls.hook}] Select an Option",
                     reply_markup=cls._inline_hook_markup()
@@ -312,4 +312,4 @@ class Shortcuts:
                 return getattr(cls, '_shortcuts_%s_reply' % args[1])(user_id, chat_id, *args)
 
             except AttributeError:
-                return [MessageReply(chat_id, f"[{cls.hook}] Invaild arguments")]
+                return [SendMessage(chat_id, f"[{cls.hook}] Invaild arguments")]

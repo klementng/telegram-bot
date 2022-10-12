@@ -4,7 +4,7 @@ import ssl
 import json
 import requests
 from http.server import SimpleHTTPRequestHandler
-from utils.api.replies import MessageReply
+from utils.api.methods import SendMessage
 from utils.api.objects import *
 from utils.exceptions import NotSupported
 from utils.server.users import UserCommandState
@@ -128,7 +128,7 @@ def handle_text_data(user_id, chat_id, text):
 
     else:
         if text in ['hello', 'hi']:
-            MessageReply(chat_id, "Beep Boop").post(CONFIG["BOT_TOKEN"])
+            SendMessage(chat_id, "Beep Boop").post(CONFIG["BOT_TOKEN"])
 
         else:
             raise NotSupported
@@ -171,13 +171,13 @@ class RequestHandler(SimpleHTTPRequestHandler):
                 raise NotSupported
 
         except NotSupported as e:
-            MessageReply(chat_id, str(e))(CONFIG["BOT_TOKEN"])  # type: ignore
+            SendMessage(chat_id, str(e))(CONFIG["BOT_TOKEN"])  # type: ignore
 
         except NotSupportedNoChatID as e:
             return  # no response is sent to user
 
         except Exception as e:
-            MessageReply(chat_id, "Unexpected error has occured: %s" %  # type: ignore
+            SendMessage(chat_id, "Unexpected error has occured: %s" %  # type: ignore
                          e)(CONFIG["BOT_TOKEN"])
 
     def do_GET(self):

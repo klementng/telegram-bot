@@ -13,13 +13,12 @@ used across the the whole project.
     db.execute_and_commit("INSERT INTO table VALUE (...)")
 
 """
-
-import os
 import json
 import atexit
 import sqlite3
 
 _connection = None
+
 
 def setup(config_path: str) -> None:
     """
@@ -27,7 +26,7 @@ def setup(config_path: str) -> None:
 
     Args:
         config_path: path to a JSON config file 
-    
+
     Returns:
         None
 
@@ -37,30 +36,32 @@ def setup(config_path: str) -> None:
         KeyError: The keys: ["database"]["DB_PATH"] does not exist
         sqlite3.OperationalError: Failed to create a connection to database
     """
-    
+
     with open(config_path) as f:
         path = json.load(f)["database"]["DB_PATH"]
-        
+
     connect(path)
 
-def connect(db_path:str) -> None:
+
+def connect(db_path: str) -> None:
     """
     Connect to database
 
     Args:
-        db_file_path: path to database
+        db_path: path to database
 
     Returns:
         None
 
     Raises:
         sqlite3.OperationalError: Database cannot be opened
-        sqlite3.OperationalError: A connection already exist
+        sqlite3.OperationalError: Database is already connected
     """
     global _connection
-    
+
     if _connection is not None:
-        raise sqlite3.OperationalError("Database is already connected, run disconnect() before connecting")
+        raise sqlite3.OperationalError(
+            "Database is already connected, run disconnect() before connecting")
 
     _connection = sqlite3.connect(f'file:{str(db_path)}?mode=rw', uri=True)
 
@@ -69,30 +70,34 @@ def connect(db_path:str) -> None:
 def disconnect() -> None:
     """Disconnect from database"""
     global _connection
-    
+
     if _connection is None:
         return
-    
+
     conn = get_connection()
     conn.commit()
     conn.close()
     _connection = None
+
 
 def get_connection() -> sqlite3.Connection:
     """
     Get connection object of database
 
     Returns: 
-        sqlite3.Connection object
+        sqlite3.Connection
 
     Raises:
         sqlite3.OperationalError: Database not connected
+
     """
     global _connection
     if not _connection:
-        raise sqlite3.OperationalError("Database is Not Connected: Run db.connect() first")
+        raise sqlite3.OperationalError(
+            "Database is Not Connected: Run db.connect() first")
 
     return _connection
+
 
 def get_cursor():
     """
@@ -108,11 +113,13 @@ def get_cursor():
     global _connection
 
     if not _connection:
-        raise sqlite3.OperationalError("Database is Not Connected: Run db.connect() first")
+        raise sqlite3.OperationalError(
+            "Database is Not Connected: Run db.connect() first")
 
     return _connection.cursor()
 
-def execute(sql:str,format=None) -> list[tuple]:
+
+def execute(sql: str, format=None) -> list[tuple]:
     """
     Execute a SQL command to database
 
@@ -126,26 +133,28 @@ def execute(sql:str,format=None) -> list[tuple]:
 
     Raises:
         sqlite3.OperationalError: Database not connected
-        sqlite3.OperationalError: Invaild SQL syntax
+        sqlite3.OperationalError: Invaild SQL syntax / format
     """
     cur = get_cursor()
 
     if format is not None:
-        return cur.execute(sql,format).fetchall()
+        return cur.execute(sql, format).fetchall()
     else:
         return cur.execute(sql).fetchall()
+
 
 def commit() -> None:
     """
     Commit changes to database
 
     Raises:
-        sqlite3.OperationalError: Database Not connected
+        sqlite3.OperationalError: Database is not connected
     """
 
     get_connection().commit()
 
-def execute_and_commit(sql:str,format=None) -> list[tuple]:
+
+def execute_and_commit(sql: str, format=None) -> list[tuple]:
     """
     Execute and commit SQL command to database
 
@@ -164,9 +173,9 @@ def execute_and_commit(sql:str,format=None) -> list[tuple]:
 
     cur = get_cursor()
     if format is not None:
-        cur = cur.execute(sql,format).fetchall()
+        cur = cur.execute(sql, format).fetchall()
     else:
         cur = cur.execute(sql).fetchall()
-    
+
     commit()
     return cur

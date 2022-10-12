@@ -9,8 +9,8 @@ import requests
 from utils.api.objects import TelegramObject, InlineKeyboardMarkup
 
 
-class BasicReply:
-    """Base class reply class"""
+class TelegramMethods:
+    """Base telegram methods class"""
 
     def __init__(self, method: str, **kwargs) -> None:
         self.method = method
@@ -49,7 +49,7 @@ class BasicReply:
 
 
 @dataclasses.dataclass
-class MessageReply(BasicReply):
+class SendMessage(TelegramMethods):
     chat_id: Union[int, str]
     text: str
 
@@ -68,7 +68,7 @@ class MessageReply(BasicReply):
 
 
 @dataclasses.dataclass
-class PhotoReply(BasicReply):
+class SendPhoto(TelegramMethods):
 
     chat_id: Union[str,int]
     photo: bytes
