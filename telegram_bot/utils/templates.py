@@ -8,14 +8,15 @@ import jinja2
 
 JINJA_ENV = jinja2.Environment(loader=jinja2.FileSystemLoader("templates/"))
 
-def setup(path):
-    global JINJA_ENV
-    JINJA_ENV = jinja2.Environment(loader=jinja2.FileSystemLoader(path))
-    JINJA_ENV.filters['format_iso_time'] = format_iso_time
+# def setup(path):
+#     global JINJA_ENV
+#     JINJA_ENV = jinja2.Environment(loader=jinja2.FileSystemLoader(path))
+#     JINJA_ENV.filters['format_iso_time'] = format_iso_time
 
 
 def format_iso_time(isoformat,format = '%Y-%m-%d %H:%M'):
     return datetime.fromisoformat(isoformat).strftime(format)
+JINJA_ENV.filters['format_iso_time'] = format_iso_time
 
 
 def render_response_template(path,*args,**kwargs) -> str:

@@ -28,7 +28,7 @@ class TelegramObject(DataClassJsonMixin):
 
         else:
             raise ValueError(
-                f"{cls.__name__}.decode() accepts dict/str(json) type")
+                f"{cls.__name__}.decode() only accepts dict/str(json) type")
 
     # def to_json
     #    ....  -- defined in @dataclass_json
@@ -54,12 +54,12 @@ class Location(TelegramObject):
     latitude: float
 
     # Optional
-    horizontal_accuracy: Optional[float]
+    horizontal_accuracy: Optional[float] = None
 
     # Optional: Live location only
-    live_period: Optional[int]
-    heading: Optional[float]
-    proximity_alert_radius: Optional[float]
+    live_period: Optional[int] = None
+    heading: Optional[float] = None
+    proximity_alert_radius: Optional[float] = None
 
 
 @dataclass_json

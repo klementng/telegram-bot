@@ -117,7 +117,7 @@ def handle_text_data(user_id, chat_id, text):
         usr_state.update_state(text, False)
         run_command_from_modules(*args, chat_id=chat_id, user_id=user_id)
 
-    # Look if server is waiting for a response
+    # Look if server is listening for additional args
     elif usr_state.is_awaiting_user_reply() == True:
 
         last_command = usr_state.get_last_command()
@@ -185,7 +185,7 @@ class RequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
 
-def setup(config_path, modules, templates_folder_path="templates/"):
+def setup(config_path, modules):
     """
     Connect to database using a config file
 
@@ -205,8 +205,6 @@ def setup(config_path, modules, templates_folder_path="templates/"):
     
     global CONFIG
     global MODULES
-
-    utils.templates.setup(templates_folder_path)
 
     with open(config_path) as f:
         CONFIG = json.load(f)["server"]

@@ -18,7 +18,7 @@ class Weather:
 
     @classmethod
     def _inline_hook_reply(cls,chat_id,*args,**kwargs) -> list[MessageReply]:
-        """return inline keyboard for /cls. Return [(method,response)]"""
+        """Return message with inline keyboard"""
 
         labels = [
             ["24 Hours Forecast"],
@@ -44,6 +44,8 @@ class Weather:
 
     @classmethod
     def _inline_forecast24_reply(cls,chat_id, *args,**kwargs):
+        """Return message with inline keyboard for 24 hours forecast"""
+        
         labels = [
             ["North"],
             ["West", "Central", "East"],
@@ -70,6 +72,16 @@ class Weather:
 
     @staticmethod
     def _fetch_forecast24_api():
+        """
+        Fetch 24 hour forecast from api.
+        
+        Returns:
+            API response (dict)
+        
+        Raises:
+            requests.HTTPError: API error
+        """
+
         api_response = requests.get(
             url='https://api.data.gov.sg/v1/environment/24-hour-weather-forecast')
         api_response.raise_for_status()
@@ -78,6 +90,15 @@ class Weather:
 
     @staticmethod
     def _fetch_forecast4d_api():
+        """
+        Fetches 4 day forecasts from api.
+        
+        Returns:
+            API response (dict)
+        
+        Raises:
+            requests.HTTPError: API error
+        """
         api_response = requests.get(
             url='https://api.data.gov.sg/v1/environment/4-day-weather-forecast')
         api_response.raise_for_status()
@@ -86,12 +107,21 @@ class Weather:
     
     @staticmethod
     def _fetch_rainmap_api(dt:datetime = datetime.now()):
+        """
+        Fetches rainmaps images from api.
+        
+        Returns:
+            last updated time and photo (datetime,bytes)
+    
+        Raises:
+            requests.HTTPError: API error
+        """
         
         @functools.cache
         def get_static_images():
             static_images_url = [
-                "http://www.cls.gov.sg/wp-content/themes/wiptheme/assets/img/base-853.png",
-                "http://www.cls.gov.sg/wp-content/themes/wiptheme/images/SG-Township.png",
+                "http://www.weather.gov.sg/wp-content/themes/wiptheme/assets/img/base-853.png",
+                "http://www.weather.gov.sg/wp-content/themes/wiptheme/images/SG-Township.png",
             ]
 
             images = []
@@ -112,7 +142,7 @@ class Weather:
 
             time = round_datetime(time,5) # round to nearest 5mins
 
-            url = f"http://www.cls.gov.sg/files/rainarea/50km/v2/dpsri_70km_{time.strftime('%Y%m%d%H%M')}0000dBR.dpsri.png"
+            url = f"http://www.weather.gov.sg/files/rainarea/50km/v2/dpsri_70km_{time.strftime('%Y%m%d%H%M')}0000dBR.dpsri.png"
             r = requests.get(url, stream=True)
             
             if r.status_code == 200:
@@ -149,22 +179,29 @@ class Weather:
             return rainmap_time,photo.read()
         
         static_images = get_static_images()
-        rainmap_time,overlay = get_rain_overlay(dt) #Snice the api is slow
+        rainmap_time,overlay = get_rain_overlay(dt - timedelta(minutes=5)) #Snice the api is slow
 
         return sitch_images(rainmap_time)
 
     @classmethod
     def _weather_help_reply(cls,chat_id,*args,**kwargs):
-        """Help response, return [('sendMessage', response_json)]"""
+        """Render help response"""
+
         assert args[1] == "help"
-                                      
-        text = render_response_template("weather/help.html")
+
+        try:                              
+            text = render_response_template("weather/help.html")
+        except:
+            text ="An error occured"
+
         response = MessageReply(chat_id,text,parse_mode="HTML")
         
         return [response]
 
     @classmethod
     def _weather_forecast24_reply(cls,chat_id, *args,**kwargs):
+        """Get 24 hr forecast"""
+
         assert args[1] == "forecast24"
 
         if len(args) == 2:
@@ -188,6 +225,8 @@ class Weather:
 
             except HTTPError as e:
                 text = "API Error, Try Again Later"
+            except Exception as e:
+                text ="An error occured" + str(e)
         
         else:
             text = "Too many arugmenst"
@@ -242,8 +281,7 @@ class Weather:
         Args:
             *args: parsed user inputs
             
-            **chat_id: chat where the input is sent
-        
+            **chat_id: chat id
         """
         assert (args[0] == cls.hook)
         
