@@ -8,45 +8,105 @@ from utils.api.replies import MessageReply
 from utils.api.objects import *
 from utils.exceptions import NotSupported
 from utils.server.users import UserCommandState
-import utils.templates 
+import utils.templates
 
 CONFIG = {}
 MODULES = {}
 
-
 def run_command_from_modules(*args, **kwargs):
+    """
+    Get replies from modules and send it
+
+    Args:
+        *args: Commands arguments to pass to modules
+            -> *args =  ["/weather","forecast24"]
+
+        **kwargs: Keyword arguments required for modules
+            -> **kwargs = {"chat_id":...,"user_id":...} 
+
+    Returns:
+        None
+
+    Raises:
+        NotSupported: The hook (args[0]) does not match any modules 
+        requests.HTTPError: An error occured posting to telegram servers
+
+        See also: Respective errors raised by modules:
+            -> NotSupported: Invaild Arguments
+
+    """
+
     module = MODULES.get(args[0])
     if module == None:
         raise NotSupported
 
     for action in module.get_reply(*args, **kwargs):
-        action(CONFIG["BOT_TOKEN"])
+        action(CONFIG["BOT_TOKEN"], raise_errors=True)
 
     return
 
-def parse_incoming_res(res_type, response):
+
+def parse_incoming_res(res_type: str, response: str):
+    """
+    Parse supported objects 
+
+    Args:
+        res_type: Name of object received
+            -> see https://core.telegram.org/bots/api/#update
+
+        response: dict/json of object
+
+    Returns:
+        None
+
+    Raises:
+        ValueError: Failed Decode of json/dict
+    """
+
+    user_id, chat_id, data = None, None, None
 
     if "callback_query" == res_type:
-        cbq = CallbackQuery(**response)
+        cbq = CallbackQuery.decode(response)
         cbq.answer(CONFIG["BOT_TOKEN"])
-        
+
         chat_id = cbq.get_chat_id()
-        user_id = cbq.get_user().id
+        user_id = cbq.get_user_id()
         data = cbq.data
 
     elif "message" == res_type:
-        msg = Message(**response)
-        user_id = msg.get_user().id
+        msg = Message.decode(response)
+        user_id = msg.get_user_id()
         chat_id = msg.get_chat_id()
         data = msg.get_content()
-
-    else:
-        raise NotSupportedNoChatID
 
     return user_id, chat_id, data
 
 
 def handle_text_data(user_id, chat_id, text):
+    """
+    Parse text for commands  
+
+    Args:
+        user_id: user id of sender
+        chat_id: chat id of sender
+        text: commands to parse
+
+    Returns:
+        None
+
+    Raises:
+        NotSupported: Unregonized commands
+        ValueError: Invaild Parsing
+
+        From run_command_from_modules():
+            NotSupported: The hook (args[0]) does not match any modules 
+            requests.HTTPError: An error occured posting to telegram servers
+
+            See also: Respective errors raised by modules:
+                -> NotSupported: Invaild Arguments
+
+    """
+
     text = text.lower().strip()
 
     args = shlex.split(text)
@@ -95,8 +155,12 @@ class RequestHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             return
 
+        user_id, chat_id, data = None,None,None
         try:
             user_id, chat_id, data = parse_incoming_res(obj_type, received)
+
+            if chat_id == None:
+                raise NotSupportedNoChatID
 
             if type(data) == str:
                 handle_text_data(user_id, chat_id, data)
@@ -107,14 +171,13 @@ class RequestHandler(SimpleHTTPRequestHandler):
                 raise NotSupported
 
         except NotSupported as e:
-            MessageReply(chat_id, str(e))(CONFIG["BOT_TOKEN"])
+            MessageReply(chat_id, str(e))(CONFIG["BOT_TOKEN"])  # type: ignore
 
         except NotSupportedNoChatID as e:
-            #no response is sent to user
-            return
+            return  # no response is sent to user
 
         except Exception as e:
-            MessageReply(chat_id, "Unexpected error has occured: %s" %
+            MessageReply(chat_id, "Unexpected error has occured: %s" %  # type: ignore
                          e)(CONFIG["BOT_TOKEN"])
 
     def do_GET(self):
@@ -123,11 +186,28 @@ class RequestHandler(SimpleHTTPRequestHandler):
 
 
 def setup(config_path, modules, templates_folder_path="templates/"):
+    """
+    Connect to database using a config file
+
+    Args:
+        config_path: path to a JSON config file 
+    
+    Returns:
+        None
+
+    Raises:
+        IOError: Config file cannot be read
+        json.JSONDecodeError: Invaild JSON
+        KeyError: The keys: ["server"] does not exist
+        request.HTTPError: API error when setting up certs
+    """
+    
+    
     global CONFIG
     global MODULES
 
     utils.templates.setup(templates_folder_path)
-    
+
     with open(config_path) as f:
         CONFIG = json.load(f)["server"]
 
@@ -135,16 +215,18 @@ def setup(config_path, modules, templates_folder_path="templates/"):
 
     with open(CONFIG["CERT_PATH"]) as cert:
         url = f'https://api.telegram.org/bot{CONFIG["BOT_TOKEN"]}/setWebhook?url={CONFIG["HOSTNAME"]}:{CONFIG["PORT"]}'
-        requests.post(url, files={'certificate': cert})
-    
-    url = f'https://api.telegram.org/bot{CONFIG["BOT_TOKEN"]}/setMyCommands'
-    
-    commands_list = [{"command":m.hook.replace("/",""), "description":m.description} for m in modules]
-    requests.post(url,params={"commands":json.dumps(commands_list)})
+        requests.post(url, files={'certificate': cert}).raise_for_status()
 
+    url = f'https://api.telegram.org/bot{CONFIG["BOT_TOKEN"]}/setMyCommands'
+
+    commands_list = [{"command": m.hook.replace(
+        "/", ""), "description": m.description} for m in modules]
+    requests.post(url, params={"commands": json.dumps(commands_list)}).raise_for_status()
 
 
 def run():
+    """Starts the server"""
+
     handler = RequestHandler
     socketserver.TCPServer.allow_reuse_address = True
     server = socketserver.TCPServer((CONFIG["HOST"], CONFIG["PORT"]), handler)
@@ -157,5 +239,5 @@ def run():
         server_side=True
     )
 
-    #TODO Add threading 
+    # TODO Add threading
     server.serve_forever()

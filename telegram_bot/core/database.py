@@ -21,7 +21,7 @@ import sqlite3
 
 _connection = None
 
-def setup(config_path: os.PathLike) -> None:
+def setup(config_path: str) -> None:
     """
     Connect to database using a config file
 
@@ -67,9 +67,7 @@ def connect(db_path:str) -> None:
 
 @atexit.register
 def disconnect() -> None:
-    """
-    Disconnect from database
-    """
+    """Disconnect from database"""
     global _connection
     
     if _connection is None:
@@ -90,6 +88,7 @@ def get_connection() -> sqlite3.Connection:
     Raises:
         sqlite3.OperationalError: Database not connected
     """
+    global _connection
     if not _connection:
         raise sqlite3.OperationalError("Database is Not Connected: Run db.connect() first")
 
@@ -131,7 +130,10 @@ def execute(sql:str,format=None) -> list[tuple]:
     """
     cur = get_cursor()
 
-    return cur.execute(sql,format).fetchall()
+    if format is not None:
+        return cur.execute(sql,format).fetchall()
+    else:
+        return cur.execute(sql).fetchall()
 
 def commit() -> None:
     """
@@ -161,6 +163,10 @@ def execute_and_commit(sql:str,format=None) -> list[tuple]:
     """
 
     cur = get_cursor()
-    cur = cur.execute(sql,format)
+    if format is not None:
+        cur = cur.execute(sql,format).fetchall()
+    else:
+        cur = cur.execute(sql).fetchall()
+    
     commit()
-    return cur.fetchall()
+    return cur
