@@ -54,12 +54,12 @@ class Location(TelegramObject):
     latitude: float
 
     # Optional
-    horizontal_accuracy: Optional[float]
+    horizontal_accuracy: Optional[float] = None
 
     # Optional: Live location only
-    live_period: Optional[int]
-    heading: Optional[float]
-    proximity_alert_radius: Optional[float]
+    live_period: Optional[int] = None
+    heading: Optional[float] = None
+    proximity_alert_radius: Optional[float] = None
 
 
 @dataclass_json
