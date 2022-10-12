@@ -18,8 +18,21 @@ def format_iso_time(isoformat,format = '%Y-%m-%d %H:%M'):
     return datetime.fromisoformat(isoformat).strftime(format)
 
 
-def render_response_template(path,*args,**kwargs):
-    """Render the HMTL templates ..... 1234"""
+def render_response_template(path,*args,**kwargs) -> str:
+    """
+    Render the HMTL templates. 
+    
+    Also supports for 2 additional tags: <p></p> and <br> or <br/>
+    
+    Args:
+        path: path to html file from root
+
+    Returns:
+        Fomatted html for telegram api
+    
+    Raises:
+        jinja2.TemplateNotFound: html file not found at given path
+    """
 
     template = JINJA_ENV.get_template(path)
     html = template.render(*args,**kwargs)
@@ -43,8 +56,9 @@ def render_response_template(path,*args,**kwargs):
             continue
         
         line_stripped = line_stripped.replace('<p>',"")
-        line_stripped = line_stripped.replace('<br>',"\n")
         line_stripped = line_stripped.replace('</p>',"\n\n")
+        line_stripped = line_stripped.replace('<br>',"\n")
+        line_stripped = line_stripped.replace('<br/>',"\n")
         
         html_processed += line_stripped
 

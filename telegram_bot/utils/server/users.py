@@ -28,8 +28,11 @@ class UserCommandState:
     def get_last_command(self):
         if self.require_follow_up == None:
             self._run_query()
-        
-        return self.last_command
+
+        if self.last_command != None:
+            return self.last_command
+        else:
+            return ""
 
         
     def update_state(self,command,require_follow_up):

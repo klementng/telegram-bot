@@ -16,9 +16,9 @@ class Weather:
     hook = "/weather"
     description = "Singapore Weather"
 
-    @staticmethod
-    def _inline_hook_reply(chat_id,*args,**kwargs):
-        """return inline keyboard for /weather. Return [(method,response)]"""
+    @classmethod
+    def _inline_hook_reply(cls,chat_id,*args,**kwargs) -> list[MessageReply]:
+        """return inline keyboard for /cls. Return [(method,response)]"""
 
         labels = [
             ["24 Hours Forecast"],
@@ -28,22 +28,22 @@ class Weather:
         ]
 
         commands = [
-            [f"{Weather.hook} forecast24"],
-            [f"{Weather.hook} forecast4d"],
-            [f"{Weather.hook} rainmap"],
-            [f"{Weather.hook} help"],
+            [f"{cls.hook} forecast24"],
+            [f"{cls.hook} forecast4d"],
+            [f"{cls.hook} rainmap"],
+            [f"{cls.hook} help"],
         ]
 
-        reponse = MessageReply(
+        reply = MessageReply(
             chat_id,
-            text=f"[{Weather.hook}] Select an Option",
+            text=f"[{cls.hook}] Select an Option",
             reply_markup=InlineKeyboardMarkup(labels, commands)
         )
 
-        return [reponse]
+        return [reply]
 
-    @staticmethod
-    def _inline_forecast24_reply(chat_id, *args,**kwargs):
+    @classmethod
+    def _inline_forecast24_reply(cls,chat_id, *args,**kwargs):
         labels = [
             ["North"],
             ["West", "Central", "East"],
@@ -51,18 +51,18 @@ class Weather:
         ]
 
         commands = [
-            [f"{Weather.hook} forecast24 north"],
+            [f"{cls.hook} forecast24 north"],
             [
-                f"{Weather.hook} forecast24 west",
-                f"{Weather.hook} forecast24 central",
-                f"{Weather.hook} forecast24 east"
+                f"{cls.hook} forecast24 west",
+                f"{cls.hook} forecast24 central",
+                f"{cls.hook} forecast24 east"
             ],
-            [f"{Weather.hook} forecast24 south"]
+            [f"{cls.hook} forecast24 south"]
         ]
 
         reponse = MessageReply(
             chat_id,
-            text=f"[{Weather.hook}] Select an Option",
+            text=f"[{cls.hook}] Select an Option",
             reply_markup=InlineKeyboardMarkup(labels, commands)
         )
 
@@ -76,6 +76,7 @@ class Weather:
 
         return api_response.json()['items'][0]
 
+    @staticmethod
     def _fetch_forecast4d_api():
         api_response = requests.get(
             url='https://api.data.gov.sg/v1/environment/4-day-weather-forecast')
@@ -89,8 +90,8 @@ class Weather:
         @functools.cache
         def get_static_images():
             static_images_url = [
-                "http://www.weather.gov.sg/wp-content/themes/wiptheme/assets/img/base-853.png",
-                "http://www.weather.gov.sg/wp-content/themes/wiptheme/images/SG-Township.png",
+                "http://www.cls.gov.sg/wp-content/themes/wiptheme/assets/img/base-853.png",
+                "http://www.cls.gov.sg/wp-content/themes/wiptheme/images/SG-Township.png",
             ]
 
             images = []
@@ -106,12 +107,12 @@ class Weather:
 
         max_it = 10
         @functools.lru_cache(10)
-        def get_rain_overlay(time):
+        def get_rain_overlay(time:datetime) -> tuple[datetime,Image.Image]:
             nonlocal max_it
 
             time = round_datetime(time,5) # round to nearest 5mins
 
-            url = f"http://www.weather.gov.sg/files/rainarea/50km/v2/dpsri_70km_{time.strftime('%Y%m%d%H%M')}0000dBR.dpsri.png"
+            url = f"http://www.cls.gov.sg/files/rainarea/50km/v2/dpsri_70km_{time.strftime('%Y%m%d%H%M')}0000dBR.dpsri.png"
             r = requests.get(url, stream=True)
             
             if r.status_code == 200:
@@ -125,11 +126,12 @@ class Weather:
 
             else:
                 #Max iterations
-                r.status_code = 418 #Force HTTP error to raise
+                r.status_code = 404 #Force HTTP error to raise
                 r.raise_for_status()
+                raise HTTPError
 
         @functools.lru_cache(5)
-        def sitch_images(rainmap_time):
+        def sitch_images(rainmap_time:datetime) -> tuple[datetime,bytes]:
             nonlocal static_images
             nonlocal overlay
             
@@ -144,15 +146,15 @@ class Weather:
             base.save(photo, 'PNG')
             photo.seek(0)
 
-            return rainmap_time,photo
+            return rainmap_time,photo.read()
         
         static_images = get_static_images()
         rainmap_time,overlay = get_rain_overlay(dt) #Snice the api is slow
 
         return sitch_images(rainmap_time)
 
-    @staticmethod
-    def _weather_help_reply(chat_id,*args,**kwargs):
+    @classmethod
+    def _weather_help_reply(cls,chat_id,*args,**kwargs):
         """Help response, return [('sendMessage', response_json)]"""
         assert args[1] == "help"
                                       
@@ -161,12 +163,12 @@ class Weather:
         
         return [response]
 
-    @staticmethod
-    def _weather_forecast24_reply(chat_id, *args,**kwargs):
+    @classmethod
+    def _weather_forecast24_reply(cls,chat_id, *args,**kwargs):
         assert args[1] == "forecast24"
 
         if len(args) == 2:
-            return Weather._inline_forecast24_reply(chat_id)
+            return cls._inline_forecast24_reply(chat_id)
 
         elif len(args) == 3:
 
@@ -175,7 +177,7 @@ class Weather:
                 return [MessageReply(chat_id,f"Invalid Arguments '{args[2]}'")]
 
             try:
-                weather_api = Weather._fetch_forecast24_api()
+                weather_api = cls._fetch_forecast24_api()
 
                 text = render_response_template(
                     "weather/forecast24.html",
@@ -186,17 +188,20 @@ class Weather:
 
             except HTTPError as e:
                 text = "API Error, Try Again Later"
+        
+        else:
+            text = "Too many arugmenst"
 
         response = MessageReply(chat_id,text,parse_mode="HTML")
 
         return [response]                                       
 
-    @staticmethod
-    def _weather_forecast4d_reply(chat_id, *args,**kwargs):
+    @classmethod
+    def _weather_forecast4d_reply(cls,chat_id, *args,**kwargs):
         assert args[1] == "forecast4d"
 
         try:
-            weather_api = Weather._fetch_forecast4d_api()                                        
+            weather_api = cls._fetch_forecast4d_api()                                        
             text = render_response_template(                                       
                 "weather/forecast4d.html",
                 title=f"4 Day Outlook",
@@ -209,15 +214,15 @@ class Weather:
         response = MessageReply(chat_id,text,parse_mode="HTML")
         return [response]
 
-    @staticmethod
-    def _weather_rainmap_reply(chat_id, *args,**kwargs):
+    @classmethod
+    def _weather_rainmap_reply(cls,chat_id, *args,**kwargs):
         
         assert args[1] == "rainmap"
 
         time = round_datetime(datetime.now() - timedelta(minutes=5),5)
 
         try:
-            rainmap_time,photo  = Weather._fetch_rainmap_api(time)
+            rainmap_time,photo  = cls._fetch_rainmap_api(time)
             response = PhotoReply(
                 chat_id,
                 photo,
@@ -229,15 +234,29 @@ class Weather:
 
         return [response]
 
-    @staticmethod
-    def get_reply(*args,**kwargs):
-        assert (args[0] == Weather.hook)
+    @classmethod
+    def get_reply(cls,*args,**kwargs):
+        """
+        Get replies for commands:
 
-        chat_id = kwargs.pop("chat_id")
-        assert chat_id != None
+        Args:
+            *args: parsed user inputs
+            
+            **chat_id: chat where the input is sent
+        
+        """
+        assert (args[0] == cls.hook)
+        
+        try:
+            chat_id = int(kwargs["chat_id"])
+        except ValueError:
+            raise ValueError("Chat id must be a int")
+        except KeyError:
+            raise ValueError("Missing kwargs:chat_id ")
+        
         
         if len(args) == 1:
-            return Weather._inline_hook_reply(chat_id)
+            return cls._inline_hook_reply(chat_id)
 
         elif len(args) >= 2:
             try:

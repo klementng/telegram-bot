@@ -3,20 +3,23 @@ Wrappers/Callable Classes for request.post() to telegrams servers.
 """
 
 import dataclasses
+from typing import Optional, Union
 import requests
 
 from utils.api.objects import TelegramObject, InlineKeyboardMarkup
 
-class BasicReply:
 
-    def __init__(self,method:str,**kwargs) -> None:
+class BasicReply:
+    """Base class reply class"""
+
+    def __init__(self, method: str, **kwargs) -> None:
         self.method = method
         self.__dict__.update(kwargs)
-    
+
     def __call__(self, *args, **kwargs):
-        return self.post(*args,*kwargs)
-    
-    def post_url(self,token:str):
+        return self.post(*args, *kwargs)
+
+    def post_url(self, token: str):
         return f'https://api.telegram.org/bot{token}/{self.method}'
 
     def response_dict(self):
@@ -24,17 +27,17 @@ class BasicReply:
 
         for name, value in vars(self).items():
             if not (name.startswith('__') or isinstance(value, classmethod)):
-                
-                if isinstance(value,TelegramObject):
-                    response_dict.update({name:value.to_json()})
+
+                if isinstance(value, TelegramObject):
+                    response_dict.update({name: value.to_json()})
                 else:
                     response_dict[name] = value
 
         return response_dict
 
-    def post(self,token,raise_errors=False):
+    def post(self, token, raise_errors=False):
 
-        r= requests.post(
+        r = requests.post(
             url=self.post_url(token),
             params=self.response_dict()
         )
@@ -44,47 +47,49 @@ class BasicReply:
 
         return r.status_code
 
+
 @dataclasses.dataclass
 class MessageReply(BasicReply):
-
-    chat_id: str
+    chat_id: Union[int, str]
     text: str
-    reply_markup:InlineKeyboardMarkup = None
-    parse_mode:str = None
 
-    caption_entities:list = None
-    disable_notification:bool=None
-    protect_content:bool = None
-    reply_to_message_id:str = None
-    allow_sending_without_reply:bool = None
+    _: dataclasses.KW_ONLY
+    reply_markup: Optional[InlineKeyboardMarkup] = None
+    parse_mode: Optional[str] = None
 
-    def post_url(self,token:str):
+    caption_entities: Optional[list] = None
+    disable_notification: Optional[bool] = None
+    protect_content: Optional[bool] = None
+    reply_to_message_id: Optional[str] = None
+    allow_sending_without_reply: Optional[bool] = None
+
+    def post_url(self, token: str):
         return f'https://api.telegram.org/bot{token}/sendMessage'
 
-        
+
 @dataclasses.dataclass
 class PhotoReply(BasicReply):
 
     chat_id: str
     photo: bytes
-    caption:str = None
-    reply_markup:dict = None
-    parse_mode:str = None
-    
-    caption_entities:list = None
-    disable_notification:bool=None
-    protect_content:bool = None
-    reply_to_message_id:str = None
-    allow_sending_without_reply:bool = None
+    caption: Optional[str] = None
+    reply_markup: Optional[dict] = None
+    parse_mode: Optional[str] = None
 
-    def post_url(self,token:str):
+    caption_entities: Optional[list] = None
+    disable_notification: Optional[bool] = None
+    protect_content: Optional[bool] = None
+    reply_to_message_id: Optional[str] = None
+    allow_sending_without_reply: Optional[bool] = None
+
+    def post_url(self, token: str):
         return f'https://api.telegram.org/bot{token}/sendPhoto'
-    
-    def post(self,token,raise_errors=False):
+
+    def post(self, token, raise_errors=False):
         params = self.response_dict()
         photo = params.pop('photo')
 
-        r= requests.post(
+        r = requests.post(
             url=self.post_url(token),
             params=params,
             files={'photo': photo}
