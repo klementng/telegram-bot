@@ -28,7 +28,7 @@ class TelegramObject(DataClassJsonMixin):
 
         else:
             raise ValueError(
-                f"{cls.__name__}.decode() accepts dict/str(json) type")
+                f"{cls.__name__}.decode() only accepts dict/str(json) type")
 
     # def to_json
     #    ....  -- defined in @dataclass_json
