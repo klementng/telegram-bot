@@ -70,7 +70,7 @@ class MessageReply(BasicReply):
 @dataclasses.dataclass
 class PhotoReply(BasicReply):
 
-    chat_id: str
+    chat_id: Union[str,int]
     photo: bytes
     caption: Optional[str] = None
     reply_markup: Optional[dict] = None
