@@ -9,7 +9,7 @@ from http.server import SimpleHTTPRequestHandler
 from utils.api.methods import SendMessage
 from utils.api.objects import *
 from utils.exceptions import NotSupported
-from utils.server.users import UserState
+from utils.server.session import UserSession
 
 CONFIG = {}
 MODULES = {}
@@ -104,17 +104,17 @@ def handle_text_data(user_id, chat_id, text):
     text = text.lower().strip()
 
     args = shlex.split(text)
-    usr_state = UserState(user_id, chat_id)
+    session = UserSession(user_id, chat_id)
 
     # Handle Commands
     if text.startswith("/"):
-        usr_state.update_state(text, False)  # Reset state. 
+        session.update_state(text, False)  # Reset state. 
         run_command_from_modules(*args, chat_id=chat_id, user_id=user_id)
 
     # Look if server is listening for additional args
-    elif usr_state.is_awaiting_user_reply() == True:
+    elif session.is_addl_args_required() == True:
 
-        last_command = usr_state.get_last_command()
+        last_command = session.get_last_executed_command()
         text = last_command + " " + text
 
         args = shlex.split(text)

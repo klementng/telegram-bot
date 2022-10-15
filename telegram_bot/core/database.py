@@ -10,8 +10,7 @@ used across the the whole project.
 
     db.connect("example.db")
     query = db.execute("SELECT * FROM table WHERE id=?",(id,))
-    db.execute_and_commit("INSERT INTO table VALUE (...)")
-
+    db.execute_and_commit("INSERT INTO table VALUE (...)"
 """
 import json
 import atexit

@@ -1,4 +1,3 @@
-from ast import arg
 import requests
 import functools
 

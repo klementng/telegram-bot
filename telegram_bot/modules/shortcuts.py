@@ -4,7 +4,7 @@ import core.database as db
 from typing import Iterable
 from utils.api.methods import TelegramMethods, SendMessage
 from utils.api.objects import InlineKeyboardMarkup
-from utils.server.users import UserState
+from utils.server.session import UserSession
 from utils.templates import render_response_template
 
 
@@ -17,10 +17,44 @@ class Shortcuts:
     Class Attributes:
         hook: tigger modules activation [default: "/shortcuts"]
         description: modules description
+
+    Instance Attributes:
+        chat_id: id of telegram chat
+        user_id id of telegram user
+
     """
 
     hook = "/shortcuts"
-    description = "set custom shortcuts / message to send to bot"
+    description = "Set custom messages / commands"
+
+    def __init__(self, chat_id: int, user_id: int) -> None:
+
+        try:
+            self.chat_id = int(chat_id)
+            self.user_id = int(user_id)
+            self.session = UserSession(user_id, chat_id)
+
+        except ValueError:
+            raise ValueError("Invaild type for chat_id or user_id")
+        except:
+            raise ValueError("Missing keyword arguments")
+
+    def __call__(self, *args):
+
+        if len(args) == 1:
+            return [
+                SendMessage(
+                    self.chat_id,
+                    f"[{self.hook}] Select an Option",
+                    reply_markup=self._inline_hook_markup()
+                )]
+
+        elif len(args) >= 2:
+            try:
+                return getattr(self, '_shortcuts_%s_reply' % args[1])(args)
+
+            except AttributeError:
+                return self._exception_reply(args[0:1], f"Unexpected arguement: '{args[1]}'")
 
     @classmethod
     def _inline_hook_markup(cls) -> InlineKeyboardMarkup:
@@ -36,8 +70,7 @@ class Shortcuts:
 
         return InlineKeyboardMarkup(labels, commands)
 
-    @classmethod
-    def _db_get(cls, user_id: int) -> list[dict]:
+    def _db_get(self) -> list[dict]:
         """
         Query database for saved command list. 
 
@@ -48,12 +81,11 @@ class Shortcuts:
             sqlite3.Error: Database error
         """
         query = db.execute(
-            "SELECT command_list FROM shortcuts WHERE user_id = ?", (user_id,))
+            "SELECT command_list FROM shortcuts WHERE user_id = ?", (self.user_id,))
 
         return json.loads(query[0][0]) if (query != []) else []
 
-    @classmethod
-    def _db_add(cls, user_id: int, name: str, command: str) -> str:
+    def _db_add(self, name: str, command: str) -> str:
         """
         Adds a new shortcuts. 
 
@@ -64,7 +96,7 @@ class Shortcuts:
             sqlite3.Error: Database error
         """
 
-        command_list = cls._db_get(user_id)
+        command_list = self._db_get()
         command_list.append({name: command})
 
         db.execute_and_commit(
@@ -76,15 +108,14 @@ class Shortcuts:
             WHERE user_id = :user_id
             """,
             {
-                "user_id": user_id,
+                "user_id": self.user_id,
                 "command_list": json.dumps(command_list)
             }
         )
 
         return f'Added!'
 
-    @classmethod
-    def _db_delete(cls, user_id: int, indexes: Iterable[int]) -> str:
+    def _db_delete(self, indexes: Iterable[int]) -> str:
         """
         Delete a shortcuts. 
 
@@ -98,7 +129,7 @@ class Shortcuts:
 
         msg = ""
 
-        command_list = cls._db_get(user_id)
+        command_list = self._db_get()
         if command_list == None:
             return "Failed: there is no commands to remove"
 
@@ -118,14 +149,13 @@ class Shortcuts:
                 """
 
         db.execute_and_commit(sql, {
-            "user_id": user_id,
+            "user_id": self.user_id,
             "command_list": json.dumps(list(command_list))
         })
 
         return msg
 
-    @classmethod
-    def _db_edit(cls, user_id: int, index: int, name: str, command: str) -> str:
+    def _db_edit(self, index: int, name: str, command: str) -> str:
         """
         Edit a saved shortcut. 
 
@@ -137,7 +167,7 @@ class Shortcuts:
             IndexError: Invaild index
         """
 
-        command_list = cls._db_get(user_id)
+        command_list = self._db_get()
         if command_list == []:
             return "There is no commands to edit"
 
@@ -149,88 +179,110 @@ class Shortcuts:
             """
 
         db.execute_and_commit(sql, {
-            "user_id": user_id,
+            "user_id": self.user_id,
             "command_list": json.dumps(list(command_list))
         })
 
         return "Succeeded!"
 
-    @classmethod
-    def _shortcuts_modify_reply(cls, user_id: int, chat_id: int, *args) -> list[TelegramMethods]:
+    def _exception_reply(self, args: tuple, msg: str, additional_info=None, listen_for_additional_args=None, **kwargs_send_message) -> list[TelegramMethods]:
+
+        commands = " ".join(args)
+        text = f"[{commands}] ERROR: {msg}"
+
+        if additional_info is not None:
+            text += f"\n\nMore Infomation: {additional_info}"
+
+        if listen_for_additional_args is not None:
+            self.session.update_state(commands, listen_for_additional_args)
+
+        return [SendMessage(self.chat_id, text, **kwargs_send_message)]
+
+    def _simple_reply(self, args: tuple, msg: str, listen_for_additional_args=None, **kwargs_send_message) -> list[TelegramMethods]:
+        commands = " ".join(args)
+        text = f"[{commands}] {msg}"
+
+        if listen_for_additional_args is not None:
+            self.session.update_state(commands, listen_for_additional_args)
+
+        return [SendMessage(self.chat_id, text, **kwargs_send_message)]
+
+    def _shortcuts_modify_reply(self, args: tuple) -> list[TelegramMethods]:
         """Modify the shortcuts list"""
 
         assert (args[1] == "modify")
-        user_state = UserState(user_id, chat_id)
+        argc = len(args)
 
         # Returns InlineKeyboard hints
-        if len(args) == 2:
+        if argc == 2:
             replies = []
 
-            msg = render_response_template(
-                "shortcuts/modfiy.html", hook=cls.hook
+            replies.extend(
+                # Render list of saved shortcuts
+                self._shortcuts_show_reply(args, show_full=True)
             )
 
-            replies.extend(
-                cls._shortcuts_show_reply(user_id, chat_id, show_full=True)
+            msg = render_response_template(
+                "shortcuts/modfiy.html", hook=self.hook
             )
-            replies.append(SendMessage(chat_id, msg, parse_mode="HTML"))
+            replies.append(SendMessage(self.chat_id, msg, parse_mode="HTML"))
 
             # Set listen for additional arg state to be true
-            user_state.update_state(" ".join(args[0:2]), True)
-            
+            self.session.update_state(" ".join(args[0:2]), True)
             return replies
 
         # Check if enough arguments
-        elif len(args) < 4:
-            user_state.update_state(" ".join(args[0:2]), True)
-            return [SendMessage(chat_id, f"[{cls.hook} modify] Error: Not enough arguments")]
+        elif argc < 4:
+            self.session.update_state(" ".join(args[0:2]), True)
+            return self._exception_reply(args[0:2], f"Not enough arguments, expected > 3, got {argc}")
 
-        msg = f"[{cls.hook} modify] "
         action = args[2]
 
         try:
-            if action == "add" and len(args) == 5:
-                name = args[3]
-                command = args[4]
-                msg += cls._db_add(user_id, name, command)
+            if action == "add" and argc == 5:
+                msg = self._db_add(args[3], args[4])  # DBError
 
-            elif action == "delete":
-                indexes = list(map(int, args[3:]))
-                msg += cls._db_delete(user_id, indexes)
+            elif action == "delete" and argc >= 4:
+                indexes = tuple(map(int, args[3:]))  # ValueError
+                msg = self._db_delete(indexes)  # IndexError,DBError
 
-            elif action == "edit" and len(args) == 6:
-                index = int(args[3])
-                name = args[4]
-                command = args[5]
-                msg += cls._db_edit(user_id, index, name, command)
+            elif action == "edit" and argc == 6:
+                index = int(args[3]) 
+                msg = self._db_edit(index, args[4], args[5]) 
 
+            elif action in ["add", "delete", "edit"]:
+
+                return self._exception_reply(
+                    args[0:2],
+                    f'Too many/few args.',
+                    additional_info=f'Expected 5 for "add", >= 4 for "delete", 6 for "edit". Got {argc}',
+                    listen_for_additional_args=True
+                )
             else:
-                raise ValueError("too many / not enough / invalid args ")
-            
-            user_state.update_state(" ".join(args[0:2]), False)
-            return [SendMessage(chat_id, msg, reply_markup=cls._inline_hook_markup())]
+                return self._exception_reply(
+                    args[0:2],
+                    f'Unexpected Arguments: "{action}"',
+                    listen_for_additional_args=True
+                )
 
-        except Exception as e:
-            # Allow user to retry
-            user_state.update_state(" ".join(args[0:2]), True)
+            return self._simple_reply(args[0:2], msg, False, reply_markup=self._inline_hook_markup())
 
-            if isinstance(e, (ValueError, IndexError)):
-                msg += "Invaild arguments, please try again:"
-            elif isinstance(e, sqlite3.Error):
-                msg += "Database error occured, please try again:"
-            else:
-                msg += "Unexpected error has occured, please try again:"
+        except sqlite3.Error as e:
+            return self._exception_reply(args[0:2], f"A Database Error has occured:", additional_info=str(e), listen_for_additional_args=True)
 
-            msg += f"\n\nMore Infomation: \n {e}"
+        except ValueError as e:
+            return self._exception_reply(args[0:2], f"Illegal arguments type", additional_info=str(e), listen_for_additional_args=True)
 
-            return [SendMessage(chat_id, msg)]
+        except IndexError as e:
+            return self._exception_reply(args[0:2], f"Index given not in saved list", additional_info=str(e), listen_for_additional_args=True)
 
-    @classmethod
-    def _shortcuts_show_reply(cls, user_id, chat_id, *args, show_full=False) -> list[TelegramMethods]:
+    def _shortcuts_show_reply(self, args, show_full=False) -> list[TelegramMethods]:
         """Query database and replies with a message with InlineMarkup"""
 
+        assert (args[1] == "show" or args[1] == "modify")
+
         try:
-            command_list = cls._db_get(user_id)
+            command_list = self._db_get()
 
             if command_list != []:
 
@@ -248,32 +300,28 @@ class Shortcuts:
 
                         callback_data.append([data])
 
-                return [
-                    SendMessage(
-                        chat_id,
-                        f"[{cls.hook}] Saved Commands:",
-                        reply_markup=InlineKeyboardMarkup(labels, callback_data))
-                ]
+                return self._simple_reply(args, "Saved shortcuts:", reply_markup=InlineKeyboardMarkup(labels, callback_data))
 
             else:
-                return [SendMessage(chat_id, f"[{cls.hook} show] Your shortcut list is empty")]
+                return self._simple_reply(args[0:2], "Your shortcuts list is empty")
 
-        except sqlite3.Error:
-            return [SendMessage(chat_id, f"[{cls.hook} show] An database error occured, try again")]
+        except sqlite3.Error as e:
+            return self._exception_reply(args[0:2], "A database error occured", additional_info=str(e), listen_for_additional_args=True)
 
-    @classmethod
-    def _shortcuts_help_reply(cls, user_id, chat_id, *args) -> list[TelegramMethods]:
+    def _shortcuts_help_reply(self, args) -> list[TelegramMethods]:
         """Render and send the help response"""
 
         assert (args[1] == "help")
-        msg = render_response_template("shortcuts/help.html", hook=cls.hook)
+        msg = render_response_template("shortcuts/help.html", hook=self.hook)
 
-        return [SendMessage(chat_id, msg, parse_mode="HTML")]
+        return [SendMessage(self.chat_id, msg, parse_mode="HTML")]
 
     @classmethod
     def get_reply(cls, *args, **kwargs):
         """
-        Get replies for commands:
+        Get replies for commands.
+
+        Instantiate an shortcuts object and call it
 
         Args:
             *args: parsed user inputs
@@ -282,7 +330,7 @@ class Shortcuts:
             **user_id: user id
 
         Returns:
-            list of callable replies objects
+            list of TelegramMethod objects
 
         Rasies:
             ValueError: Missing kwargs / Invaild type
@@ -300,17 +348,13 @@ class Shortcuts:
         except:
             raise ValueError("Missing keyword arguments")
 
-        if len(args) == 1:
-            return [
-                SendMessage(
-                    chat_id,
-                    f"[{cls.hook}] Select an Option",
-                    reply_markup=cls._inline_hook_markup()
-                )]
+        return Shortcuts(chat_id, user_id)(*args)
 
-        elif len(args) >= 2:
-            try:
-                return getattr(cls, '_shortcuts_%s_reply' % args[1])(user_id, chat_id, *args)
 
-            except AttributeError:
-                return [SendMessage(chat_id, f"[{cls.hook}] Invaild arguments")]
+class sc:
+    hook = "/sc"
+    description = "Show saved shortcuts"
+
+    @staticmethod
+    def get_reply(*args,**kwargs):
+        return Shortcuts.get_reply(*(Shortcuts.hook,"show",),**kwargs)

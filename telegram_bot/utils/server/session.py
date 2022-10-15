@@ -1,7 +1,7 @@
 from core import database as db
 
 
-class UserState:
+class UserSession:
 
     def __init__(self, user_id, chat_id) -> None:
         self.user_id = user_id
@@ -19,13 +19,13 @@ class UserState:
             self.require_follow_up = False
             self.last_command = ""
 
-    def is_awaiting_user_reply(self):
+    def is_addl_args_required(self):
         if self.require_follow_up == None:
             self._run_query()
 
         return self.require_follow_up
 
-    def get_last_command(self):
+    def get_last_executed_command(self):
         if self.require_follow_up == None:
             self._run_query()
 
