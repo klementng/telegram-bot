@@ -3,12 +3,13 @@ import socketserver
 import ssl
 import json
 import requests
+
+from typing import Union
 from http.server import SimpleHTTPRequestHandler
 from utils.api.methods import SendMessage
 from utils.api.objects import *
 from utils.exceptions import NotSupported
-from utils.server.users import UserCommandState
-import utils.templates
+from utils.server.users import UserState
 
 CONFIG = {}
 MODULES = {}
@@ -30,10 +31,6 @@ def run_command_from_modules(*args, **kwargs):
     Raises:
         NotSupported: The hook (args[0]) does not match any modules 
         requests.HTTPError: An error occured posting to telegram servers
-
-        See also: Respective errors raised by modules:
-            -> NotSupported: Invaild Arguments
-
     """
 
     module = MODULES.get(args[0])
@@ -46,7 +43,7 @@ def run_command_from_modules(*args, **kwargs):
     return
 
 
-def parse_incoming_res(res_type: str, response: str):
+def parse_incoming_res(res_type: str, response: Union[str,dict]):
     """
     Parse supported objects 
 
@@ -57,28 +54,29 @@ def parse_incoming_res(res_type: str, response: str):
         response: dict/json of object
 
     Returns:
-        None
-
-    Raises:
-        ValueError: Failed Decode of json/dict
+        user_id, chat_id, data if sucesssful. Else return none for missing fields
     """
 
     user_id, chat_id, data = None, None, None
 
-    if "callback_query" == res_type:
-        cbq = CallbackQuery.decode(response)
-        cbq.answer(CONFIG["BOT_TOKEN"])
+    try:
+        if "callback_query" == res_type:
+            cbq = CallbackQuery.decode(response)
+            cbq.answer(CONFIG["BOT_TOKEN"])
 
-        chat_id = cbq.get_chat_id()
-        user_id = cbq.get_user_id()
-        data = cbq.data
+            chat_id = cbq.get_chat_id()
+            user_id = cbq.get_user_id()
+            data = cbq.data
 
-    elif "message" == res_type:
-        msg = Message.decode(response)
-        user_id = msg.get_user_id()
-        chat_id = msg.get_chat_id()
-        data = msg.get_content()
-
+        elif "message" == res_type:
+            msg = Message.decode(response)
+            user_id = msg.get_user_id()
+            chat_id = msg.get_chat_id()
+            data = msg.get_content()
+    
+    except (ValueError,KeyError) as e:
+        pass
+    
     return user_id, chat_id, data
 
 
@@ -95,26 +93,22 @@ def handle_text_data(user_id, chat_id, text):
         None
 
     Raises:
-        NotSupported: Unregonized commands
-        ValueError: Invaild Parsing
+        NotSupported: Unregonized texts
+        sqlite3.Error: Database Error
 
         From run_command_from_modules():
             NotSupported: The hook (args[0]) does not match any modules 
             requests.HTTPError: An error occured posting to telegram servers
-
-            See also: Respective errors raised by modules:
-                -> NotSupported: Invaild Arguments
-
     """
 
     text = text.lower().strip()
 
     args = shlex.split(text)
-    usr_state = UserCommandState(user_id, chat_id)
+    usr_state = UserState(user_id, chat_id)
 
     # Handle Commands
     if text.startswith("/"):
-        usr_state.update_state(text, False)
+        usr_state.update_state(text, False)  # Reset state. 
         run_command_from_modules(*args, chat_id=chat_id, user_id=user_id)
 
     # Look if server is listening for additional args
@@ -126,7 +120,7 @@ def handle_text_data(user_id, chat_id, text):
         args = shlex.split(text)
         run_command_from_modules(*args, chat_id=chat_id, user_id=user_id)
 
-    else:
+    else: #last check of text
         if text in ['hello', 'hi']:
             SendMessage(chat_id, "Beep Boop").post(CONFIG["BOT_TOKEN"])
 
@@ -155,30 +149,30 @@ class RequestHandler(SimpleHTTPRequestHandler):
             self.end_headers()
             return
 
-        user_id, chat_id, data = None,None,None
-        try:
-            user_id, chat_id, data = parse_incoming_res(obj_type, received)
+        user_id, chat_id, data = parse_incoming_res(obj_type, received)
 
+        try:    
             if chat_id == None:
-                raise NotSupportedNoChatID
+                if user_id == None:
+                    raise Exception("Unable to Parse Chat ID")
+                else:
+                    chat_id = user_id #backup to personal chat
 
             if type(data) == str:
                 handle_text_data(user_id, chat_id, data)
 
-            elif type(data) == Location:
-                raise NotSupported("location data is not supported")
+            elif type(data) == None:
+                raise NotSupported("No data is sent")
             else:
-                raise NotSupported
+                raise NotSupported("Current type is not supported")
 
         except NotSupported as e:
-            SendMessage(chat_id, str(e))(CONFIG["BOT_TOKEN"])  # type: ignore
-
-        except NotSupportedNoChatID as e:
-            return  # no response is sent to user
+            if chat_id is not None:
+                SendMessage(chat_id, str(e)).post(CONFIG["BOT_TOKEN"])
 
         except Exception as e:
-            SendMessage(chat_id, "Unexpected error has occured: %s" %  # type: ignore
-                         e)(CONFIG["BOT_TOKEN"])
+            if chat_id is not None:
+                SendMessage(chat_id, "Unexpected error has occured: %s" %  e).post(CONFIG["BOT_TOKEN"])
 
     def do_GET(self):
         self.send_response(200)
@@ -201,7 +195,6 @@ def setup(config_path, modules):
         KeyError: The keys: ["server"] does not exist
         request.HTTPError: API error when setting up certs
     """
-    
     
     global CONFIG
     global MODULES

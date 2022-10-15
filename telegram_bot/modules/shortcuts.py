@@ -4,7 +4,7 @@ import core.database as db
 from typing import Iterable
 from utils.api.methods import TelegramMethods, SendMessage
 from utils.api.objects import InlineKeyboardMarkup
-from utils.server.users import UserCommandState
+from utils.server.users import UserState
 from utils.templates import render_response_template
 
 
@@ -160,7 +160,7 @@ class Shortcuts:
         """Modify the shortcuts list"""
 
         assert (args[1] == "modify")
-        user_state = UserCommandState(user_id, chat_id)
+        user_state = UserState(user_id, chat_id)
 
         # Returns InlineKeyboard hints
         if len(args) == 2:
@@ -177,6 +177,7 @@ class Shortcuts:
 
             # Set listen for additional arg state to be true
             user_state.update_state(" ".join(args[0:2]), True)
+            
             return replies
 
         # Check if enough arguments
@@ -204,10 +205,13 @@ class Shortcuts:
                 msg += cls._db_edit(user_id, index, name, command)
 
             else:
-                raise ValueError("too many / not enough / invaild args ")
+                raise ValueError("too many / not enough / invalid args ")
+            
+            user_state.update_state(" ".join(args[0:2]), False)
+            return [SendMessage(chat_id, msg, reply_markup=cls._inline_hook_markup())]
 
         except Exception as e:
-            # Allow user to retry, cont
+            # Allow user to retry
             user_state.update_state(" ".join(args[0:2]), True)
 
             if isinstance(e, (ValueError, IndexError)):
@@ -220,9 +224,6 @@ class Shortcuts:
             msg += f"\n\nMore Infomation: \n {e}"
 
             return [SendMessage(chat_id, msg)]
-
-        user_state.update_state(" ".join(args[0:2]), False)
-        return [SendMessage(chat_id, msg, reply_markup=cls._inline_hook_markup())]
 
     @classmethod
     def _shortcuts_show_reply(cls, user_id, chat_id, *args, show_full=False) -> list[TelegramMethods]:
@@ -276,7 +277,7 @@ class Shortcuts:
 
         Args:
             *args: parsed user inputs
-            
+
             **chat_id: chat id
             **user_id: user id
 
@@ -285,7 +286,7 @@ class Shortcuts:
 
         Rasies:
             ValueError: Missing kwargs / Invaild type
- 
+
         """
 
         assert (args[0] == cls.hook)

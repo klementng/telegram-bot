@@ -1,3 +1,4 @@
+from ast import arg
 import requests
 import functools
 
@@ -62,13 +63,13 @@ class Weather:
             [f"{cls.hook} forecast24 south"]
         ]
 
-        reponse = SendMessage(
+        reply = SendMessage(
             chat_id,
-            text=f"[{cls.hook}] Select an Option",
+            text=f"[{cls.hook} forecast24] Select an Option",
             reply_markup=InlineKeyboardMarkup(labels, commands)
         )
 
-        return [reponse]
+        return [reply]
 
     @staticmethod
     def _fetch_forecast24_api() -> dict:
@@ -107,7 +108,7 @@ class Weather:
         return api_response.json()['items'][0]
 
     @staticmethod
-    def _fetch_rainmap_api(dt: datetime = datetime.now()) -> tuple[datetime,bytes]: 
+    def _fetch_rainmap_api(dt: datetime = datetime.now()) -> tuple[datetime, bytes]:
         """
         Fetches rainmaps images from api.
 
@@ -181,10 +182,15 @@ class Weather:
             return rainmap_time, photo.read()
 
         static_images = get_static_images()
-        rainmap_time, overlay = get_rain_overlay(
-            dt - timedelta(minutes=5))  # Snice the api is slow
+        rainmap_time, overlay = get_rain_overlay(dt)  # Snice the api is slow
 
         return sitch_images(rainmap_time)
+
+    @classmethod
+    def _exception_reply(cls, chat_id: int, sub_mod_name: str, msg: str = "An Error Occured, please try again") -> list[TelegramMethods]:
+        text = f"[{cls.hook} {sub_mod_name}]:\n{msg}"
+
+        return [SendMessage(chat_id, text)]
 
     @classmethod
     def _weather_help_reply(cls, chat_id: int, *args) -> list[TelegramMethods]:
@@ -193,13 +199,13 @@ class Weather:
         assert args[1] == "help"
 
         try:
-            text = render_response_template("weather/help.html")
+            text = render_response_template("weather/help.html", hook=cls.hook)
+            response = SendMessage(chat_id, text, parse_mode="HTML")
+
+            return [response]
+
         except:
-            text = "An error occured"
-
-        response = SendMessage(chat_id, text, parse_mode="HTML")
-
-        return [response]
+            return cls._exception_reply(chat_id, args[1])
 
     @classmethod
     def _weather_forecast24_reply(cls, chat_id: int, *args) -> list[TelegramMethods]:
@@ -213,8 +219,10 @@ class Weather:
         elif len(args) == 3:
 
             region = args[2]
-            if region not in ["north", "south", "east", "west", "central"]:
-                return [SendMessage(chat_id, f"Invalid Arguments '{args[2]}'")]
+            region_list= ("north", "south", "east", "west", "central")
+            
+            if region not in region_list:
+                return cls._exception_reply(chat_id, args[1], f"Invalid region: \"{region}\"\n\nExpected options:\n{region_list}")
 
             try:
                 weather_api = cls._fetch_forecast24_api()
@@ -225,21 +233,20 @@ class Weather:
                     weather_api=weather_api,
                     region=region
                 )
+                response = SendMessage(chat_id, text, parse_mode="HTML")
+
+                return [response]
 
             except HTTPError as e:
-                text = "API Error, Try Again Later"
+                return cls._exception_reply(chat_id, args[1], "API Error, Please try again later")
             except Exception as e:
-                text = "An error occured" + str(e)
+                return cls._exception_reply(chat_id, args[1], str(e))
 
         else:
-            text = "Too many arugmenst"
-
-        response = SendMessage(chat_id, text, parse_mode="HTML")
-
-        return [response]
+            return cls._exception_reply(chat_id, args[1], f"Too many arguments, expected 3, got {len(args)}")
 
     @classmethod
-    def _weather_forecast4d_reply(cls, chat_id:int, *args) -> list[TelegramMethods]:
+    def _weather_forecast4d_reply(cls, chat_id: int, *args) -> list[TelegramMethods]:
         assert args[1] == "forecast4d"
 
         try:
@@ -249,61 +256,66 @@ class Weather:
                 title=f"4 Day Outlook",
                 weather_api=weather_api,
             )
+            reply = SendMessage(chat_id, text, parse_mode="HTML")
+            return [reply]
 
         except HTTPError as e:
-            text = "API Error, Try Again Later"
-
-        response = SendMessage(chat_id, text, parse_mode="HTML")
-        return [response]
+            return cls._exception_reply(chat_id, args[1], "API Error, Please try again later")
 
     @classmethod
-    def _weather_rainmap_reply(cls, chat_id:int, *args) -> list[TelegramMethods]:
-
+    def _weather_rainmap_reply(cls, chat_id: int, *args) -> list[TelegramMethods]:
         assert args[1] == "rainmap"
 
-        time = round_datetime(datetime.now() - timedelta(minutes=5), 5)
-
         try:
-            rainmap_time, photo = cls._fetch_rainmap_api(time)
-            response = SendPhoto(
+            rainmap_time, photo = cls._fetch_rainmap_api(datetime.now() - timedelta(minutes=5))
+            reply = SendPhoto(
                 chat_id,
                 photo,
                 caption=f"Updated: {str(rainmap_time)}"
             )
 
-        except HTTPError as e:
-            response = SendMessage(chat_id, "API Error Occured")
+            return [reply]
 
-        return [response]
+        except HTTPError as e:
+            return cls._exception_reply(chat_id, args[1], "API Error, Please try again later")
+
 
     @classmethod
     def get_reply(cls, *args, **kwargs) -> list[TelegramMethods]:
         """
         Get replies for commands:
 
-        Args:
+        Args (required):
             *args: parsed user inputs
-
             **chat_id: chat id
+
+        Return:
+            list of TelegramMethods
+
+        Raises:
+            ValueError: chat_id does not exist / not an int
         """
-        assert (args[0] == cls.hook)
+        assert (args[0] == cls.hook)  # Sanity check
 
         try:
             chat_id = int(kwargs["chat_id"])
         except ValueError:
-            raise ValueError("Chat id must be a int")
+            raise ValueError("chat_id must be a int")
         except KeyError:
-            raise ValueError("Missing kwargs:chat_id ")
+            raise ValueError("Missing kwargs: chat_id ")
 
         if len(args) == 1:
             return cls._inline_hook_reply(chat_id)
 
         elif len(args) >= 2:
-            try:
-                return getattr(Weather, '_weather_%s_reply' % args[1])(chat_id, *args)
 
-            except AttributeError:
-                return [SendMessage(chat_id, f"Invaild arguments: {args[1:]} ")]
-        
+            sub_module = '_weather_%s_reply' % args[1]
+
+            if hasattr(cls, sub_module):
+                return getattr(cls, sub_module)(chat_id, *args)
+
+            else:
+                return cls._exception_reply(chat_id,"",f"Invalid arguments: {args[1:]}")
+
         else:
-            raise Exception("This should not happen")
+            raise Exception("This should never happen")

@@ -6,12 +6,13 @@ Objects can be be found in "Available types" section in: https://core.telegram.o
 
 import numpy as np
 from typing import Optional
-import dataclasses
+
 from utils.exceptions import *
-from dataclasses import InitVar, field, dataclass
+from dataclasses import InitVar, field, dataclass, KW_ONLY
 from dataclasses_json import Undefined, CatchAll, DataClassJsonMixin
 from dataclasses_json import dataclass_json, config
 import utils.api.methods as methods
+
 
 @dataclass
 class TelegramObject(DataClassJsonMixin):
@@ -46,7 +47,7 @@ class TelegramObject(DataClassJsonMixin):
 @dataclass_json
 @dataclass
 class Location(TelegramObject):
-    _: dataclasses.KW_ONLY
+    _: KW_ONLY
 
     # Guaranteed from api
     longitude: float
@@ -64,7 +65,7 @@ class Location(TelegramObject):
 @dataclass_json
 @dataclass
 class Chat(TelegramObject):
-    _: dataclasses.KW_ONLY
+    _: KW_ONLY
 
     # Guaranteed from api
     id: str
@@ -98,7 +99,7 @@ class Chat(TelegramObject):
 @dataclass_json
 @dataclass
 class User(TelegramObject):
-    _: dataclasses.KW_ONLY
+    _: KW_ONLY
     # Guaranteed from api
     id: int
     is_bot: bool
@@ -120,7 +121,7 @@ class User(TelegramObject):
 @dataclass_json(undefined=Undefined.INCLUDE)
 @dataclass
 class Message(TelegramObject):
-    _: dataclasses.KW_ONLY
+    _: KW_ONLY
 
     # Guaranteed from api
     message_id: int
@@ -159,7 +160,7 @@ class Message(TelegramObject):
 @dataclass_json
 @dataclass
 class CallbackQuery(TelegramObject):
-    _: dataclasses.KW_ONLY
+    _: KW_ONLY
     id: str
     from_: User = field(metadata=config(field_name="from"))
 
@@ -190,7 +191,7 @@ class CallbackQuery(TelegramObject):
 
 @dataclass(init=False)
 class InlineKeyboardMarkup(TelegramObject):
-    _: dataclasses.KW_ONLY
+    _: KW_ONLY
     inline_keyboard: list = field(init=False, default_factory=list)
 
     def __init__(self, labels, callback_data) -> None:
@@ -198,27 +199,23 @@ class InlineKeyboardMarkup(TelegramObject):
             labels, callback_data)
 
     @staticmethod
-    def _build(labels, data) -> list:
-        data = np.array(data)
-        labels = np.array(labels)
+    def _build(labels:list[list[str]], data:list[list[str]]) -> list:
+        
+        try:
+            inline_keyboard = []
+            
+            for i in range(len(labels)):
+                tmp = []
 
-        if data.shape != labels.shape:
-            raise ValueError("label and data shape are not equal")
-        elif len(data.shape) == 1 and type(data[0]) == list:
-            # TODO: FIND a better solutions
-            pass
-        elif len(data.shape) != 2:
-            raise ValueError("label and data shape must be 2D")
+                for j in range(len(labels[i])):
+                    tmp.append(
+                        {"text": str(labels[i][j]), "callback_data": str(data[i][j])})
 
-        inine_keyboard = []
+                inline_keyboard.append(tmp)
+            
+            return inline_keyboard
+        
+        except Exception as e:
+            raise TypeError(f"Invaild parameters types. Ensure that 1) list is 2D, 2) labels and data have the same shape. " + str(e))
 
-        for i in range(len(labels)):
-            tmp = []
 
-            for j in range(len(labels[i])):
-                tmp.append(
-                    {"text": str(labels[i][j]), "callback_data": str(data[i][j])})
-
-            inine_keyboard.append(tmp)
-
-        return inine_keyboard
