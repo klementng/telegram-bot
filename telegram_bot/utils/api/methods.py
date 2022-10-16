@@ -1,5 +1,8 @@
 """
 Wrappers/Callable Classes for request.post() to telegrams servers.
+
+More Infomation: https://core.telegram.org/bots/api/#available-methods
+
 """
 
 import dataclasses
@@ -10,7 +13,12 @@ from utils.api.objects import TelegramObject, InlineKeyboardMarkup
 
 
 class TelegramMethods:
-    """Base telegram methods class"""
+    """
+    Base telegram methods class
+    
+    Attributes:
+    methods: name of telegram methods 
+    """
 
     def __init__(self, method: str, **kwargs) -> None:
         self.method = method
@@ -27,6 +35,9 @@ class TelegramMethods:
 
         for name, value in vars(self).items():
             if not (name.startswith('__') or isinstance(value, classmethod)):
+                
+                if name == 'method':
+                    continue
 
                 if isinstance(value, TelegramObject):
                     response_dict.update({name: value.to_json()})

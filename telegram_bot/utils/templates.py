@@ -15,7 +15,12 @@ JINJA_ENV = jinja2.Environment(loader=jinja2.FileSystemLoader("templates/"))
 
 
 def format_iso_time(isoformat,format = '%Y-%m-%d %H:%M'):
+    """
+    Accepts time str in isoformat. Returns formatted time
+    """
     return datetime.fromisoformat(isoformat).strftime(format)
+
+
 JINJA_ENV.filters['format_iso_time'] = format_iso_time
 
 

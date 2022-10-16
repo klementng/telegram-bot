@@ -4,13 +4,11 @@ This module contains dataclasses for object returned/used by the telegram bot ap
 Objects can be be found in "Available types" section in: https://core.telegram.org/bots/api
 """
 
-import numpy as np
 from typing import Optional
 
 from utils.exceptions import *
-from dataclasses import InitVar, field, dataclass, KW_ONLY
-from dataclasses_json import Undefined, CatchAll, DataClassJsonMixin
-from dataclasses_json import dataclass_json, config
+from dataclasses import field, dataclass, KW_ONLY
+from dataclasses_json import Undefined, CatchAll, DataClassJsonMixin ,dataclass_json, config
 import utils.api.methods as methods
 
 

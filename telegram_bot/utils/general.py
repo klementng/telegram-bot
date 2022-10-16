@@ -3,11 +3,11 @@ from datetime import datetime
 
 def round_datetime(tm:datetime, delta:int) -> datetime:
     """
-    Round down Datatime object to the nearest delta mins
+    Round down Datatime object to the nearest {delta} mins
 
     Args:
         tm: datetime object
-        delta: mins to round to
+        delta: nearest mins to round to
 
     Return:
         Rounded down datetime object

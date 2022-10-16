@@ -1,13 +1,16 @@
+from typing import Union , Optional
+
 from core import database as db
 
 
 class UserSession:
 
-    def __init__(self, user_id, chat_id) -> None:
+    def __init__(self, user_id:Union[int,str], chat_id:Union[int,str]) -> None:
         self.user_id = user_id
         self.chat_id = chat_id
-        self.require_follow_up = None
-        self.last_command = None
+
+        self.require_follow_up:Optional[bool] = None
+        self.last_command:Optional[str] = None
 
     def _run_query(self):
         query = db.execute("SELECT last_command,require_follow_up FROM usercommandstate WHERE user_id = :user_id AND chat_id = :chat_id", {

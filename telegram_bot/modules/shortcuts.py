@@ -20,7 +20,8 @@ class Shortcuts:
 
     Instance Attributes:
         chat_id: id of telegram chat
-        user_id id of telegram user
+        user_id: id of telegram user
+        session: UserSession Object
 
     """
 

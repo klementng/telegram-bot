@@ -1,3 +1,4 @@
-Pillow
-requests
-Jinja2
+dataclasses_json==0.5.7
+Jinja2==3.1.2
+Pillow==9.2.0
+requests==2.22.0

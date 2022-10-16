@@ -9,7 +9,6 @@ from modules.shortcuts import Shortcuts,sc
 
 if __name__ == "__main__":
     database.setup("config.json")
-
     server.setup("config.json",[Weather,Shortcuts,sc])
 
     server.run()

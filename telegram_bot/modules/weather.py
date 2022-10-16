@@ -218,8 +218,8 @@ class Weather:
         elif len(args) == 3:
 
             region = args[2]
-            region_list= ("north", "south", "east", "west", "central")
-            
+            region_list = ("north", "south", "east", "west", "central")
+
             if region not in region_list:
                 return cls._exception_reply(chat_id, args[1], f"Invalid region: \"{region}\"\n\nExpected options:\n{region_list}")
 
@@ -266,7 +266,8 @@ class Weather:
         assert args[1] == "rainmap"
 
         try:
-            rainmap_time, photo = cls._fetch_rainmap_api(datetime.now() - timedelta(minutes=5))
+            rainmap_time, photo = cls._fetch_rainmap_api(
+                datetime.now() - timedelta(minutes=5))
             reply = SendPhoto(
                 chat_id,
                 photo,
@@ -277,7 +278,6 @@ class Weather:
 
         except HTTPError as e:
             return cls._exception_reply(chat_id, args[1], "API Error, Please try again later")
-
 
     @classmethod
     def get_reply(cls, *args, **kwargs) -> list[TelegramMethods]:
@@ -314,7 +314,7 @@ class Weather:
                 return getattr(cls, sub_module)(chat_id, *args)
 
             else:
-                return cls._exception_reply(chat_id,"",f"Invalid arguments: {args[1:]}")
+                return cls._exception_reply(chat_id, "", f"Invalid arguments: {args[1:]}")
 
         else:
             raise Exception("This should never happen")

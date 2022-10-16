@@ -8,11 +8,12 @@ from typing import Union
 from http.server import SimpleHTTPRequestHandler
 from utils.api.methods import SendMessage
 from utils.api.objects import *
-from utils.exceptions import NotSupported
+from utils.exceptions import NotSupportedErr
 from utils.server.session import UserSession
 
 CONFIG = {}
 MODULES = {}
+
 
 def run_command_from_modules(*args, **kwargs):
     """
@@ -35,7 +36,7 @@ def run_command_from_modules(*args, **kwargs):
 
     module = MODULES.get(args[0])
     if module == None:
-        raise NotSupported
+        raise NotSupportedErr
 
     for action in module.get_reply(*args, **kwargs):
         action(CONFIG["BOT_TOKEN"], raise_errors=True)
@@ -43,7 +44,7 @@ def run_command_from_modules(*args, **kwargs):
     return
 
 
-def parse_incoming_res(res_type: str, response: Union[str,dict]):
+def parse_incoming_res(res_type: str, response: Union[str, dict]):
     """
     Parse supported objects 
 
@@ -73,10 +74,10 @@ def parse_incoming_res(res_type: str, response: Union[str,dict]):
             user_id = msg.get_user_id()
             chat_id = msg.get_chat_id()
             data = msg.get_content()
-    
-    except (ValueError,KeyError) as e:
+
+    except (ValueError, KeyError) as e:
         pass
-    
+
     return user_id, chat_id, data
 
 
@@ -108,7 +109,7 @@ def handle_text_data(user_id, chat_id, text):
 
     # Handle Commands
     if text.startswith("/"):
-        session.update_state(text, False)  # Reset state. 
+        session.update_state(text, False)  # Reset state.
         run_command_from_modules(*args, chat_id=chat_id, user_id=user_id)
 
     # Look if server is listening for additional args
@@ -120,12 +121,12 @@ def handle_text_data(user_id, chat_id, text):
         args = shlex.split(text)
         run_command_from_modules(*args, chat_id=chat_id, user_id=user_id)
 
-    else: #last check of text
+    else:  # last check of text
         if text in ['hello', 'hi']:
             SendMessage(chat_id, "Beep Boop").post(CONFIG["BOT_TOKEN"])
 
         else:
-            raise NotSupported
+            raise NotSupportedErr
 
 
 class RequestHandler(SimpleHTTPRequestHandler):
@@ -151,28 +152,29 @@ class RequestHandler(SimpleHTTPRequestHandler):
 
         user_id, chat_id, data = parse_incoming_res(obj_type, received)
 
-        try:    
+        try:
             if chat_id == None:
                 if user_id == None:
                     raise Exception("Unable to Parse Chat ID")
                 else:
-                    chat_id = user_id #backup to personal chat
+                    chat_id = user_id  # backup to personal chat
 
             if type(data) == str:
                 handle_text_data(user_id, chat_id, data)
 
             elif type(data) == None:
-                raise NotSupported("No data is sent")
+                raise NotSupportedErr("No data is sent")
             else:
-                raise NotSupported("Current type is not supported")
+                raise NotSupportedErr("Current type is not supported")
 
-        except NotSupported as e:
+        except NotSupportedErr as e:
             if chat_id is not None:
                 SendMessage(chat_id, str(e)).post(CONFIG["BOT_TOKEN"])
 
         except Exception as e:
             if chat_id is not None:
-                SendMessage(chat_id, "Unexpected error has occured: %s" %  e).post(CONFIG["BOT_TOKEN"])
+                SendMessage(chat_id, "Unexpected error has occured: %s" %
+                            e).post(CONFIG["BOT_TOKEN"])
 
     def do_GET(self):
         self.send_response(200)
@@ -185,7 +187,7 @@ def setup(config_path, modules):
 
     Args:
         config_path: path to a JSON config file 
-    
+
     Returns:
         None
 
@@ -195,7 +197,7 @@ def setup(config_path, modules):
         KeyError: The keys: ["server"] does not exist
         request.HTTPError: API error when setting up certs
     """
-    
+
     global CONFIG
     global MODULES
 
@@ -212,7 +214,8 @@ def setup(config_path, modules):
 
     commands_list = [{"command": m.hook.replace(
         "/", ""), "description": m.description} for m in modules]
-    requests.post(url, params={"commands": json.dumps(commands_list)}).raise_for_status()
+    requests.post(url, params={"commands": json.dumps(
+        commands_list)}).raise_for_status()
 
 
 def run():
